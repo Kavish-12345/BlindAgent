@@ -163,9 +163,65 @@
       .recip { font-weight: 600; }
       .addr { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); font: 12px ui-monospace, monospace; word-break: break-all; }
       .addr:first-child { border-top: 0; }
+      #toasts { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); width: calc(100% - 24px); max-width: 440px; z-index: 90; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+      .toast { pointer-events: auto; display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; background: #0b0b0b; border: 1px solid #444; border-radius: 14px; padding: 10px 12px; font-size: 13px; box-shadow: 0 12px 32px rgba(0,0,0,.7); animation: up .18s ease-out; word-break: break-word; }
+      .toast.ok { border-color: rgba(74,222,128,.6); } .toast.bad { border-color: rgba(248,113,113,.7); } .toast.warn { border-color: rgba(251,191,36,.6); }
+      .toast.ok > span { color: var(--ok); } .toast.bad > span { color: var(--bad); } .toast.warn > span { color: var(--warn); }
+      .toast .pill { flex: none; padding: 2px 8px !important; }
+      .lock-msg { font-size: 13px; text-align: left; padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(248,113,113,.5); color: var(--bad); }
+      .lock-msg.ok { border-color: rgba(74,222,128,.5); color: var(--ok); }
+      .lock-wait { font-size: 13px; padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(251,191,36,.5); color: var(--warn); }
+      .rule-v input[type=text]:hover { border-color: #333 !important; }
+      .rule-v input[type=text]:focus { border-color: #fff !important; background: #000 !important; }
+      #rRecipSummary { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+      #saveStatus .decision { font-size: 13px; }
+      .tabdot { position: absolute; top: 4px; right: 30%; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+      .guide { border-color: #333 !important; }
+      .field-msg { color: var(--bad); font-size: 12px; margin-top: 8px; }
+      /* ---- Request sheets (MetaMask-style: one at a time, full screen, actions pinned at the bottom) ---- */
+      #prompts:not(:empty) { position: fixed; inset: 0; z-index: 85; background: rgba(0,0,0,.85) !important; display: flex; align-items: stretch; justify-content: center; padding: 0; }
+      #prompts .prompt { display: none; }
+      #prompts .prompt:first-child { display: flex; }
+      body.modal-open { overflow: hidden; }
+      body.modal-open #toasts { display: none; }
+      .sx { flex-direction: column; width: 100%; max-width: 440px; height: 100%; background: #0b0b0b !important; border: 0 !important; border-left: 1px solid #222 !important; border-right: 1px solid #222 !important; border-radius: 0 !important; box-shadow: none !important; margin: 0 !important; animation: up .18s ease-out; }
+      .sx-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #222; font-size: 12px; color: var(--muted); }
+      .sx-site { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #333; border-radius: 999px; padding: 4px 10px; color: #ddd; }
+      .sx-site i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; }
+      .sx-net { border: 1px solid #333; border-radius: 999px; padding: 4px 10px; }
+      .sx-scroll { flex: 1; overflow: auto; padding: 18px 16px 8px; }
+      .sx-title { font-size: 18px; font-weight: 600; text-align: center; margin-bottom: 4px; letter-spacing: -0.01em; }
+      .sx-sub { text-align: center; color: var(--muted); margin: 0 0 14px; }
+      .sx-amount { font-size: 34px; font-weight: 300; text-align: center; margin: 14px 0 12px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+      .sx-verdict { border: 1px solid #333; border-radius: 12px; padding: 10px 12px; margin: 8px 0 12px; font-size: 13px; }
+      .sx-verdict > div:first-child { font-weight: 600; }
+      .sx-verdict.ok { border-color: rgba(74,222,128,.45); } .sx-verdict.ok > div:first-child { color: var(--ok); }
+      .sx-verdict.bad { border-color: rgba(248,113,113,.55); } .sx-verdict.bad > div:first-child { color: var(--bad); }
+      .sx-verdict.warn { border-color: rgba(251,191,36,.5); } .sx-verdict.warn > div:first-child { color: var(--warn); }
+      .sx-verdict ul { margin: 6px 0 0; padding-left: 18px; color: #ccc; }
+      .sx-origin { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #333; color: #ccc; }
+      .sx-origin q { color: var(--bad); font-style: italic; }
+      .sx-rows { border: 1px solid #222; border-radius: 12px; padding: 2px 12px; }
+      .sx-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid #1c1c1c; font-size: 13px; }
+      .sx-row:first-child { border-top: 0; }
+      .sx-row > span:first-child { color: var(--muted); flex: none; }
+      .sx-row > span:last-child { text-align: right; word-break: break-all; }
+      .mono { font-family: ui-monospace, Menlo, monospace; }
+      .sx-account { display: flex; gap: 12px; align-items: center; border: 1px solid #222; border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+      .sx-account .avatar { width: 36px; height: 36px; }
+      .sx-perms { border: 1px solid #222; border-radius: 12px; padding: 6px 12px; margin-bottom: 12px; font-size: 13px; }
+      .sx-perms div { padding: 6px 0; } .sx-perms .yes { color: #ddd; } .sx-perms .no { color: var(--muted); }
+      .sx-perms .yes::first-letter { color: var(--ok); } .sx-perms .no::first-letter { color: var(--bad); }
+      .sx details.tech { margin-top: 12px; }
+      .sx-count { text-align: center; font-size: 12px; color: var(--muted); }
+      .sx-count:empty { display: none; }
+      .sx-actions { display: flex; gap: 10px; padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid #222; }
+      .sx-actions button { flex: 1; padding: 13px !important; font-size: 15px; }
+      button.primary.danger-fill { background: var(--bad) !important; border-color: var(--bad) !important; color: #000 !important; }
     </style>
   </head>
   <body>
+    <div id="toasts" aria-live="polite"></div>
     <div id="simBanner" class="banner sim" style="display:none">Simulate only — nothing will be signed or sent</div>
     <div id="directBanner" class="banner direct" style="display:none">Direct mode — not anonymous. Your network address is visible to the RPC provider.</div>
 
@@ -178,9 +234,12 @@
         <input id="pass" type="password" placeholder="Password" />
         <div id="importRow2"><button id="importBtn" class="primary big">Save and unlock</button></div>
         <div id="unlockRow"><button id="unlockBtn" class="primary big">Unlock</button></div>
+        <div id="lockMsg" class="lock-msg" role="alert" style="display:none"></div>
+        <div id="lockWaiting" class="lock-wait" style="display:none">An app is waiting to connect — unlock to review its request.</div>
         <a id="lockForgot" href="#">Forgot password?</a>
         <div class="lock-or"><span>or</span></div>
         <button id="lockTrial" class="big">Try a free trial account</button>
+        <a id="lockSimulate" href="#">Just explore — simulate only (no key needed)</a>
         <p class="muted lock-foot">Keys never leave this browser · every request is private</p>
       </div>
     </div>
@@ -190,9 +249,6 @@
     </div>
 
     <main>
-      <section class="card" id="opener" style="display:none">
-        <p class="warn" style="margin:0">Open this wallet from an app (for example the agent app) to connect it.</p>
-      </section>
 
       <!-- Account -->
       <section data-tab="home" class="card">
@@ -206,6 +262,8 @@
         <div class="balance" id="balance">—</div>
         <div class="muted" id="balanceSub">Wallet balance</div>
       </section>
+
+      <section data-tab="home" class="card guide"><h2>Next step</h2><div id="guide"></div></section>
 
       <!-- Approval requests appear here -->
       <div id="prompts"></div>
@@ -235,27 +293,25 @@
       <!-- Rules -->
       <section data-tab="rules" class="card">
         <h2>Your rules</h2>
+        <p class="muted" style="margin:-4px 0 6px">Tap a value to change it, then Save. Your browser wallet asks you to confirm.</p>
         <div id="ruleRows">
             <div class="rule"><div class="rule-l">Who can be paid</div><div class="rule-v"><span id="rRecipSummary" class="recip"></span><textarea id="rRecipients" hidden></textarea></div><button class="pen" id="recipBtn" title="Edit">✎</button></div>
             <div class="rule"><div class="rule-l">Max per payment</div><div class="rule-v"><input id="rPerTx" type="text" readonly /> <span class="unit">USDC</span></div><button class="pen" data-edit="rPerTx" title="Edit">✎</button></div>
             <div class="rule"><div class="rule-l">Max per day</div><div class="rule-v"><input id="rPerDay" type="text" readonly /> <span class="unit">USDC</span></div><button class="pen" data-edit="rPerDay" title="Edit">✎</button></div>
             <div class="rule"><div class="rule-l">ETH payments</div><div class="rule-v"><input id="rEthOn" type="checkbox" disabled /> <span class="unit">allowed</span></div><button class="pen" data-edit="rEthOn" title="Edit">✎</button></div>
-            <div class="rule"><div class="rule-l">ETH per payment</div><div class="rule-v"><input id="rEthTx" type="text" readonly /> <span class="unit">ETH</span></div><button class="pen" data-edit="rEthTx" title="Edit">✎</button></div>
-            <div class="rule"><div class="rule-l">ETH per day</div><div class="rule-v"><input id="rEthDay" type="text" readonly /> <span class="unit">ETH</span></div><button class="pen" data-edit="rEthDay" title="Edit">✎</button></div>
+            <div class="rule" id="rowEthTx"><div class="rule-l">ETH per payment</div><div class="rule-v"><input id="rEthTx" type="text" readonly /> <span class="unit">ETH</span></div><button class="pen" data-edit="rEthTx" title="Edit">✎</button></div>
+            <div class="rule" id="rowEthDay"><div class="rule-l">ETH per day</div><div class="rule-v"><input id="rEthDay" type="text" readonly /> <span class="unit">ETH</span></div><button class="pen" data-edit="rEthDay" title="Edit">✎</button></div>
             <div class="rule"><div class="rule-l">Ask me above</div><div class="rule-v"><input id="rAsk" type="text" readonly /> <span class="unit">USD</span></div><button class="pen" data-edit="rAsk" title="Edit">✎</button></div>
             <div class="rule"><div class="rule-l">Payments per hour</div><div class="rule-v"><input id="rRate" type="text" readonly /> <span class="unit">max (0 = no limit)</span></div><button class="pen" data-edit="rRate" title="Edit">✎</button></div>
             <div class="rule"><div class="rule-l">Block new contracts</div><div class="rule-v"><input id="rNewOn" type="checkbox" disabled /> <span class="unit">younger than ~7 days</span></div><button class="pen" data-edit="rNewOn" title="Edit">✎</button></div>
             <div id="saveBar" style="display:none">
               <div id="rulesDiff"></div>
-              <div id="rulesAuth" style="display:none">
-                <div id="rulesKeyState" class="muted"></div>
-                <div class="row" id="rulesImportRow"><input id="rulesPk" type="password" placeholder="Rules key (once — from .env RULES_PRIVATE_KEY)" /><input id="rulesPass1" type="password" placeholder="New rules password" /><button id="rulesImportBtn">Save key</button></div>
-                <div class="row" id="rulesUnlockRow"><input id="rulesPass" type="password" placeholder="Rules password" /><button id="rulesUnlockBtn" class="primary">Confirm</button></div>
-              </div>
+              <div id="saveStatus" aria-live="polite"></div>
+              <div id="ownerRow" class="muted" style="margin-top:6px"></div>
               <div class="row"><button id="rulesSave" class="primary">Save changes</button><button id="rulesCancel">Discard</button></div>
             </div>
         </div>
-        <div id="rules" class="muted">Loading…</div>
+        <div id="rules" class="muted">Connecting privately… your rules appear in a moment.</div>
       </section>
 
       <!-- Privacy & network -->
@@ -280,6 +336,7 @@
           <div class="sheet-head"><b>Who can be paid</b><button id="addrClose" class="pill" title="Close">✕</button></div>
           <p class="muted" style="margin:0 0 10px">Only these addresses can receive payments from your agent.</p>
           <div id="addrList"></div>
+          <div id="addrMsg" class="field-msg" style="display:none"></div>
           <div class="row"><input id="addrNew" type="text" placeholder="Add an address (0x…)" /><button id="addrAdd">Add</button></div>
           <div class="row"><button id="addrDone" class="primary full">Done</button></div>
         </div>
@@ -288,7 +345,7 @@
     <nav class="tabs">
       <button data-tab-btn="home" class="on"><span class="ic">⌂</span>Home</button>
       <button data-tab-btn="activity"><span class="ic">≡</span>Activity<b id="actBadge" class="badge" style="display:none"></b></button>
-      <button data-tab-btn="rules"><span class="ic">⛨</span>Rules</button>
+      <button data-tab-btn="rules"><span class="ic">⛨</span>Rules<i id="rulesTabDot" class="tabdot" title="Unsaved changes" style="display:none"></i></button>
       <button data-tab-btn="settings"><span class="ic">⚙</span>Settings</button>
     </nav>
     <script type="module" src="/src/main.ts"></script>

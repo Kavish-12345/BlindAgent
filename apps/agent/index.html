@@ -145,6 +145,31 @@
       .fnum { width: 28px; height: 28px; border-radius: 50%; border: 1px solid #fff; display: grid; place-items: center; font-size: 13px; }
       .setup-h { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 16px; }
       .hero { padding: 0 !important; }
+      .field-msg { font-size: 13px; margin-top: 10px; color: var(--bad); } .field-msg.ok { color: var(--ok); }
+      .setup-msg { margin: 0 0 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; color: var(--muted); }
+      .setup-msg.bad { color: var(--bad); border-color: rgba(248,113,113,.5); } .setup-msg.ok { color: var(--ok); border-color: rgba(74,222,128,.5); } .setup-msg.warn { color: var(--warn); border-color: rgba(251,191,36,.5); }
+      .scard.now { border-color: #fff; }
+      pre.sdk { font: 12px/1.6 ui-monospace, Menlo, Consolas, monospace; background: #050505; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0 0 14px; overflow-x: auto; color: #e5e5e5; white-space: pre; }
+      pre.sdk .k { color: #c4b5fd; } pre.sdk .s { color: #86efac; } pre.sdk .c { color: #6b7280; }
+      body:not(.dev) details.tech { display: none; }
+      .msg.step.pending { color: var(--muted); }
+      .msg.step.bad { color: var(--bad); } .msg.step.warn { color: var(--warn); } .msg.step.ok { color: var(--ok); }
+      .msg.step.ok a { color: var(--ok) !important; }
+      .hero.compact > section:not(#setup) { display: none; }
+      .hero.compact #setup { margin-top: 0; border-top: 0; padding-top: 6px; }
+      .hero.compact { margin-bottom: 14px; }
+      .msg.working { align-self: flex-start; font-size: 13px; color: var(--ink); padding: 6px 4px; display: flex; gap: 8px; align-items: center; }
+      .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #444; border-top-color: #fff; animation: spin .8s linear infinite; flex: none; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @media (max-width: 560px) {
+        header { flex-wrap: wrap; padding: 10px 12px; gap: 8px; }
+        .hdr-right { flex: 1 1 100%; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
+        #session { flex: 1 1 auto; min-width: 0; max-width: none; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+        header button { padding: 7px 12px !important; font-size: 13px; }
+        .msg { max-width: 92%; }
+        footer { padding: 10px 12px; }
+        .inner { padding: 12px; }
+      }
     </style>
   </head>
   <body>
@@ -153,7 +178,7 @@
       <div class="hdr-right">
         <button id="aiPill" class="pill" style="display:none" title="Change AI model or key">● AI ready</button>
         <div id="session"></div>
-        <button id="connect" class="primary">Connect wallet</button>
+        <button id="connect" class="primary">Connect Blindspot</button>
         <button id="disconnect" style="display:none">Disconnect</button>
       </div>
     </header>
@@ -187,12 +212,17 @@
           <section id="setup" class="block">
             <div class="eyebrow">Get started</div>
             <h2 class="setup-h">Two steps and you're ready</h2>
+            <div id="setupMsg" class="setup-msg" role="status" style="display:none"></div>
             <div class="setup-grid">
             <div class="scard" id="s1">
               <div class="snum">1</div>
-              <h3>Connect your wallet</h3>
-              <p class="muted">Your keys stay in the wallet. The agent can only ask.</p>
-              <button id="connect2" class="primary">Connect wallet</button>
+              <h3>Connect with the Blindspot SDK</h3>
+              <p class="muted">This agent holds no keys. One SDK call opens your Blindspot wallet, you approve, and the agent can only ask.</p>
+              <pre class="sdk"><span class="c">// any agent · a few lines</span>
+<span class="k">import</span> { connect } <span class="k">from</span> <span class="s">'@blindspot/sdk'</span>;
+<span class="k">const</span> wallet = <span class="k">await</span> connect(opts);
+<span class="k">const</span> tools = wallet.openAiTools();</pre>
+              <button id="connect2" class="primary">▶ Run connect()</button>
               <div id="s1done" class="ok" style="display:none">✓ Connected</div>
             </div>
             <div class="scard" id="s2">
@@ -204,6 +234,7 @@
           <div class="row" id="customRow" style="display:none"><input id="customUrl" placeholder="Endpoint URL (…/v1/chat/completions)" /><input id="customModel" placeholder="Model name" /></div>
           <div id="keyState" class="muted" style="margin-top:10px"></div>
           <div class="row" id="aiKeyRow"><input id="aiKey" type="password" placeholder="AI key" /><input id="aiPass" type="password" placeholder="Password" /><button id="saveKey">Save</button></div>
+          <div id="keyMsg" class="field-msg" role="alert" style="display:none"></div>
           <div class="row" id="aiUnlockRow" style="display:none"><input id="aiUnlockPass" type="password" placeholder="Password" /><button id="unlockKey">Unlock</button><button id="forgetKey">Remove</button></div>
           <p class="muted" style="margin:10px 0 0">This agent never holds wallet keys or funds. Every action goes through your Blindspot wallet, which checks it against your rules.</p>
         </section>
@@ -212,7 +243,7 @@
           </section>
         </div>
 
-        <div class="empty" id="empty">Connect your wallet, then tell the agent what to do.</div>
+        <div class="empty" id="empty">Connect Blindspot, then tell the agent what to do.</div>
         <ul id="log"></ul>
       </div>
     </div>
@@ -227,7 +258,7 @@
         <button id="runScripted" class="chip">Scripted run <span class="badge">SCRIPTED</span></button>
       </div>
       <div class="composer">
-        <textarea id="task" rows="1" placeholder="Tell the agent what to do — e.g. “Pay this week's invoice from vendor1 (document invoice-0101)”"></textarea>
+        <textarea id="task" rows="1" placeholder="Tell the agent what to do — e.g. “Pay this week's invoice from vendor1 (document invoice-0101)”. Blindspot connects when you send."></textarea>
         <button id="run" class="primary">Send</button>
       </div>
       <div id="hint" class="muted hint"></div>
