@@ -13,6 +13,11 @@ import {
   describeRules,
   encryptPrivateKey,
   fromPolicy,
+  diffRules,
+  toPolicy,
+  rulesOnlySigner,
+  updatePolicy,
+  type RulesDraft,
   moduleOnlySigner,
   readDecimals,
   readPolicy,
@@ -27,7 +32,7 @@ import {
   MemoryStorage,
 } from '@blindspot/core';
 import { ETH, type Decision, type Effect } from '@blindspot/shared';
-import { formatEther, formatUnits, getAddress, isHex, parseAbi, type Address, type Hex } from 'viem';
+import { formatEther, formatUnits, getAddress, isAddress, isHex, keccak256, parseAbi, toBytes, type Address, type Hex } from 'viem';
 import { generatePrivateKey, privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 import cfg from '../../../config/sepolia.json';
 import { NET_NAME, anonChain, redact, type AnonChain, type ChainStatus } from './anon';
@@ -320,6 +325,13 @@ function renderLock() {
   $('importRow').style.display = storedKey() || profile.kind === 'trial' ? 'none' : '';
   $('unlockRow').style.display = unlocked || !storedKey() ? 'none' : '';
   $('lockRow').style.display = unlocked ? '' : 'none';
+  $('importRow2').style.display = $('importRow').style.display;
+  const locked = !unlocked && !simulateOnly && profile.kind === 'demo';
+  $('lockScreen').style.display = locked ? 'flex' : 'none';
+  $('lockTitle').textContent = storedKey() ? 'Welcome back' : 'Set up your agent wallet';
+  $('lockSub').textContent = storedKey() ? "Enter your password to unlock your agent's wallet." : 'Paste your agent key once and choose a password. The key is encrypted and never leaves this browser.';
+  $('lockForgot').style.display = storedKey() ? '' : 'none';
+  if (locked) setTimeout(() => $(storedKey() ? 'pass' : 'pk').focus(), 30);
 }
 $('importBtn').onclick = async () => {
   const pk = $<HTMLInputElement>('pk').value.trim();
@@ -330,7 +342,8 @@ $('importBtn').onclick = async () => {
   try {
     localStorage.setItem(KEY_STORE, JSON.stringify(await encryptPrivateKey(pk as Hex, pass)));
     $<HTMLInputElement>('pk').value = '';
-    activity('agent key stored ENCRYPTED in this browser (PBKDF2-SHA256 600k + AES-GCM). Now unlock.', 'ok');
+    activity('Agent key saved (encrypted in this browser).', 'ok');
+    setTimeout(() => $('unlockBtn').click(), 0);
   } catch (e) {
     activity(esc((e as Error).message), 'bad');
   }
@@ -362,6 +375,7 @@ $<HTMLInputElement>('simToggle').onchange = (e) => {
   simulateOnly = (e.target as HTMLInputElement).checked;
   for (const c of contexts.values()) c.simulateOnly = simulateOnly;
   $('simBanner').style.display = simulateOnly ? '' : 'none';
+  renderLock();
   activity(simulateOnly ? 'Simulate only: ON — approving runs every check but signs and sends nothing.' : 'Simulate only: OFF — Approve & send sends real transactions.', 'warn');
   if (!simulateOnly && !agentAccount) {
     host.endAll('locked'); // sessions opened without a key cannot continue in real mode
@@ -409,8 +423,12 @@ async function showRules() {
   const rec = await readPolicy(client, profile.deployment, profile.label);
   const decimals = await readDecimals(client, rec.policy.tokens.filter((t) => t.toLowerCase() !== ETH));
   const draft = fromPolicy(rec.policy, { decimals, labels: NAMES });
+  currentRules = { draft, resolver: rec.resolver };
+  if (!dirty) fillForm(draft);
+  renderRulesSummary(draft);
+  renderRulesEditor();
   void showBalance(client);
-  $('rules').innerHTML = `<ul>${describeRules(draft).map((l) => `<li>${esc(l)}</li>`).join('')}</ul><p class="muted">Read live from the ENS record “blindspot.policy” of ${esc(profile.ensName)} through ${esc(NET_NAME[chain?.active() ?? 'nox'])} · keccak ${esc(rec.keccak.slice(0, 10))}…</p>`;
+  $('rules').innerHTML = `<p class="muted" style="margin:8px 0 0">Read live from the ENS record “blindspot.policy” of ${esc(profile.ensName)} through ${esc(NET_NAME[chain?.active() ?? 'nox'])} · keccak ${esc(rec.keccak.slice(0, 10))}…</p>`;
 }
 async function showBalance(client: ReturnType<typeof clientFor>) {
   try {
@@ -431,6 +449,199 @@ function showTraffic() {
   $('traffic').innerHTML = `This session: <b>${s.rpc.anonymized}</b> requests through Anon-RPC (${served}), <b>${s.rpc.excluded}</b> excluded${s.anonShare === null ? '' : ` — ${s.anonShare}% anonymized`}${reasons ? `<br><span class="muted">excluded: ${reasons}</span>` : ''}${githubReads ? `<br><span class="muted">declared excluded (not RPC): ${githubReads} × GitHub REST API read</span>` : ''}${relayerRequests ? `<br><span class="muted">declared (not RPC): ${relayerRequests} × trial request to the gas-only relayer</span>` : ''}`;
 }
 
+// ------------------------------------------------------------------ rules editor (rules key: may ONLY change blindspot.policy)
+const RULES_KEY_STORE = 'blindspot.wallet.rulesKey';
+let currentRules: { draft: RulesDraft; resolver: Address } | undefined;
+let rulesAccount: PrivateKeyAccount | undefined; // memory only, dropped after each save
+let pendingDraft: RulesDraft | undefined;
+const storedRulesKey = (): EncryptedKey | undefined => {
+  try {
+    const s = localStorage.getItem(RULES_KEY_STORE);
+    return s ? (JSON.parse(s) as EncryptedKey) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+const inp = (id: string) => $<HTMLInputElement>(id);
+const FIELDS = ['rRecipients', 'rPerTx', 'rPerDay', 'rEthOn', 'rEthTx', 'rEthDay', 'rAsk', 'rRate', 'rNewOn'];
+let dirty = false;
+function renderRulesSummary(_d?: RulesDraft) {
+  const list = $<HTMLTextAreaElement>('rRecipients').value.split('\n').map((x) => x.trim()).filter(Boolean);
+  $('rRecipSummary').textContent = list.length ? `${list.length} address${list.length > 1 ? 'es' : ''}` : 'Nobody';
+}
+function renderAddrList() {
+  const list = $<HTMLTextAreaElement>('rRecipients').value.split('\n').map((x) => x.trim()).filter(Boolean);
+  $('addrList').innerHTML = list.length
+    ? list.map((a, i) => `<div class="addr"><span>${esc(a)}</span><button class="pill" data-rm="${i}" title="Remove">✕</button></div>`).join('')
+    : '<p class="muted">Nobody can be paid yet.</p>';
+  document.querySelectorAll<HTMLElement>('[data-rm]').forEach((b) => {
+    b.onclick = () => {
+      list.splice(Number(b.dataset.rm), 1);
+      setRecipients(list);
+    };
+  });
+}
+function setRecipients(list: string[]) {
+  $<HTMLTextAreaElement>('rRecipients').value = list.join('\n');
+  dirty = true;
+  refreshDiff();
+  renderRulesSummary();
+  renderAddrList();
+}
+$('recipBtn').onclick = () => {
+  renderAddrList();
+  $('addrModal').style.display = 'flex';
+};
+$('addrAdd').onclick = () => {
+  const v = inp('addrNew').value.trim();
+  if (!isAddress(v, { strict: false })) return activity(`"${esc(v)}" is not an address`, 'bad');
+  const list = $<HTMLTextAreaElement>('rRecipients').value.split('\n').map((x) => x.trim()).filter(Boolean);
+  if (!list.some((x) => x.toLowerCase() === v.toLowerCase())) list.push(getAddress(v));
+  inp('addrNew').value = '';
+  setRecipients(list);
+};
+const closeAddr = () => ($('addrModal').style.display = 'none');
+$('addrDone').onclick = closeAddr;
+$('addrClose').onclick = closeAddr;
+function openRules(focus?: string) {
+  if (!currentRules || profile.kind !== 'demo') return;
+  fillForm(currentRules.draft);
+  if (focus) setTimeout(() => $(focus).focus(), 50);
+}
+function closeRules() {
+  pendingDraft = undefined;
+  rulesAccount = undefined;
+  if (currentRules) fillForm(currentRules.draft);
+}
+function renderRulesEditor() {
+  const demo = profile.kind === 'demo';
+  $('ruleRows').style.display = demo && currentRules ? '' : 'none';
+  $('rulesImportRow').style.display = storedRulesKey() ? 'none' : '';
+  $('rulesUnlockRow').style.display = storedRulesKey() ? '' : 'none';
+  $('rulesKeyState').innerHTML = storedRulesKey() ? 'Enter your rules password to save.' : 'First time: add your rules key (it can only change these rules).';
+}
+function setEditable(id: string, on: boolean) {
+  const el = $<HTMLInputElement>(id);
+  if (el.type === 'checkbox') el.disabled = !on;
+  else el.readOnly = !on;
+  el.classList.toggle('editing', on);
+  if (on && el.type !== 'checkbox') el.focus();
+}
+function fillForm(d: RulesDraft) {
+  const usdc = d.tokens.find((x) => x.address.toLowerCase() === USDC.toLowerCase());
+  $<HTMLTextAreaElement>('rRecipients').value = d.payees.map((p) => p.address).join('\n');
+  inp('rPerTx').value = usdc?.maxPerTx ?? '0';
+  inp('rPerDay').value = usdc?.perDay ?? '0';
+  inp('rEthOn').checked = Boolean(d.eth);
+  inp('rEthTx').value = d.eth?.maxPerTx ?? '0';
+  inp('rEthDay').value = d.eth?.perDay ?? '0';
+  inp('rAsk').value = d.askOwnerAboveUsd;
+  inp('rRate').value = String(d.rateLimitPerHour);
+  inp('rNewOn').checked = d.blockNewContracts;
+  renderRulesSummary();
+  FIELDS.forEach((f) => setEditable(f, false));
+  dirty = false;
+  $('saveBar').style.display = 'none';
+  $('rulesAuth').style.display = 'none';
+}
+function draftFromForm(): RulesDraft {
+  if (!currentRules) throw new Error('the current rules are not loaded yet');
+  const base = structuredClone(currentRules.draft);
+  const addrs = ($<HTMLTextAreaElement>('rRecipients').value.match(/0x[0-9a-fA-F]{40}/g) ?? []);
+  const payees = addrs.map((a) => {
+    const g = getAddress(a);
+    return NAMES[g.toLowerCase()] ? { address: g, label: NAMES[g.toLowerCase()]! } : { address: g };
+  });
+  const usdc = base.tokens.find((x) => x.address.toLowerCase() === USDC.toLowerCase());
+  if (!usdc) throw new Error('USDC is not in the current rules');
+  usdc.maxPerTx = inp('rPerTx').value.trim();
+  usdc.perDay = inp('rPerDay').value.trim();
+  const rate = Number(inp('rRate').value.trim() || '0');
+  if (!Number.isInteger(rate) || rate < 0) throw new Error('payments per hour must be a whole number (0 = no limit)');
+  const eth = inp('rEthOn').checked ? { maxPerTx: inp('rEthTx').value.trim(), perDay: inp('rEthDay').value.trim() } : null;
+  return { ...base, version: base.version + 1, payees, eth, allowEthToPayees: Boolean(eth), askOwnerAboveUsd: inp('rAsk').value.trim() || '0', rateLimitPerHour: rate, blockNewContracts: inp('rNewOn').checked };
+}
+/** Live change list while editing; Save stays disabled while the rules are invalid. */
+function refreshDiff() {
+  if (!currentRules) return;
+  try {
+    const d = draftFromForm();
+    toPolicy(d);
+    const changes = diffRules(currentRules.draft, d).filter((c) => !c.startsWith('No changes'));
+    pendingDraft = changes.length ? d : undefined;
+    $('rulesDiff').innerHTML = changes.length ? `<div class="decision warn"><div class="verdict">${changes.length} change${changes.length > 1 ? 's' : ''}</div><ul>${changes.map((c) => `<li>${esc(c.replace(/^[~+-] /, ''))}</li>`).join('')}</ul></div>` : '<p class="muted">No changes yet.</p>';
+    $<HTMLButtonElement>('rulesSave').disabled = !changes.length;
+  } catch (e) {
+    pendingDraft = undefined;
+    $('rulesDiff').innerHTML = `<div class="decision bad"><div class="verdict">✕ Not valid</div><p>${esc((e as Error).message)}</p></div>`;
+    $<HTMLButtonElement>('rulesSave').disabled = true;
+  }
+  $('saveBar').style.display = dirty ? '' : 'none';
+}
+document.querySelectorAll<HTMLButtonElement>('[data-edit]').forEach((b) => (b.onclick = () => setEditable(b.dataset.edit!, true)));
+FIELDS.forEach((f) => $(f).addEventListener('input', () => ((dirty = true), refreshDiff())));
+FIELDS.forEach((f) => $(f).addEventListener('change', () => ((dirty = true), refreshDiff())));
+$('rulesImportBtn').onclick = async () => {
+  try {
+    const pk = inp('rulesPk').value.trim();
+    if (!isHex(pk) || pk.length !== 66) throw new Error('paste the rules key (0x + 64 hex characters)');
+    if (privateKeyToAccount(pk as Hex).address === AGENT) throw new Error('that is the agent key, not the rules key');
+    localStorage.setItem(RULES_KEY_STORE, JSON.stringify(await encryptPrivateKey(pk as Hex, inp('rulesPass1').value)));
+    inp('rulesPk').value = '';
+    inp('rulesPass1').value = '';
+    activity('Rules key saved (encrypted in this browser).', 'ok');
+  } catch (e) {
+    activity(esc((e as Error).message), 'bad');
+  }
+  renderRulesEditor();
+};
+async function unlockRulesKey(): Promise<boolean> {
+  if (rulesAccount) return true;
+  if (!rpc || !currentRules || !storedRulesKey()) return false;
+  const acct = privateKeyToAccount(await decryptPrivateKey(storedRulesKey()!, inp('rulesPass').value));
+  inp('rulesPass').value = '';
+  const role = (await clientFor(rpc).readContract({ address: currentRules.resolver, abi: parseAbi(['function roles(uint256,address) view returns (uint256)']), functionName: 'roles', args: [BigInt(keccak256(toBytes('blindspot.policy'))), acct.address] })) as bigint;
+  if ((role & (1n << 24n)) === 0n) throw new Error(`this key (${shortAddr(acct.address)}) is not allowed to change the rules — run the GrantRulesKey command first`);
+  rulesAccount = acct;
+  return true;
+}
+async function saveRules() {
+  const btn = $<HTMLButtonElement>('rulesSave');
+  if (!pendingDraft || !rpc || !currentRules) return;
+  if (!rulesAccount) {
+    $('rulesAuth').style.display = '';
+    renderRulesEditor();
+    return; // the password prompt appears; Confirm continues the save
+  }
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    const signer = rulesOnlySigner(rulesAccount, currentRules.resolver, profile.ensName, profile.deployment.chainId);
+    const r = await updatePolicy({ rpc, client: clientFor(rpc), deployment: profile.deployment, label: profile.label, signer, policy: toPolicy(pendingDraft) });
+    activity(`✓ Your new rules are live on ENS — <a href="${ETHERSCAN(r.hash)}" target="_blank" rel="noopener">view transaction</a>. The next payment follows them.`, 'ok');
+    pendingDraft = undefined;
+    dirty = false;
+    await loadRules();
+  } catch (e) {
+    activity(`Rules not saved: ${esc((e as Error).message.split('\n')[0])}`, 'bad');
+  } finally {
+    rulesAccount = undefined; // lock again after every save attempt
+    btn.textContent = 'Save changes';
+    $('rulesAuth').style.display = 'none';
+    renderRulesEditor();
+  }
+}
+$('rulesSave').onclick = () => void saveRules();
+$('rulesUnlockBtn').onclick = async () => {
+  try {
+    if (await unlockRulesKey()) await saveRules();
+  } catch (e) {
+    activity(esc((e as Error).message), 'bad');
+  }
+};
+$('rulesCancel').onclick = () => closeRules();
+
+
 // ------------------------------------------------------------------ trial agents (Step 3d)
 function switchProfile(p: Profile, why: string) {
   host.endAll('locked'); // a session belongs to one agent identity
@@ -441,6 +652,8 @@ function switchProfile(p: Profile, why: string) {
   activity(why, 'warn');
   renderSessions(host.list());
   renderTrial();
+  renderRulesEditor();
+  renderLock();
   void loadRules();
 }
 function renderTrial() {
@@ -476,8 +689,41 @@ $('demoBtn').onclick = () => {
   switchProfile(DEMO, `back to the demo agent ${DEMO.ensName}; the trial key was dropped from memory.`);
 };
 
+$('pass').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  $(storedKey() ? 'unlockBtn' : 'importBtn').click();
+});
+$('lockForgot').onclick = (e) => {
+  e.preventDefault();
+  $('forgetBtn').click();
+};
+$('lockTrial').onclick = () => $('trialBtn').click();
+
+// ------------------------------------------------------------------ tabs (Home · Activity · Rules · Settings)
+let currentTab = 'home';
+let unseen = 0;
+function showTab(name: string) {
+  currentTab = name;
+  document.querySelectorAll<HTMLElement>('[data-tab]').forEach((s) => (s.style.display = s.dataset.tab === name ? '' : 'none'));
+  document.querySelectorAll<HTMLElement>('[data-tab-btn]').forEach((b) => b.classList.toggle('on', b.dataset.tabBtn === name));
+  if (name === 'activity') {
+    unseen = 0;
+    $('actBadge').style.display = 'none';
+  }
+  window.scrollTo({ top: 0 });
+}
+document.querySelectorAll<HTMLElement>('[data-tab-btn]').forEach((b) => (b.onclick = () => showTab(b.dataset.tabBtn!)));
+new MutationObserver(() => {
+  if (currentTab === 'activity') return;
+  unseen++;
+  $('actBadge').textContent = String(unseen);
+  $('actBadge').style.display = '';
+}).observe($('activity'), { childList: true });
+showTab('home');
+
 async function init() {
   renderTrial();
+  renderRulesEditor();
   renderLock();
   renderSessions([]);
   analytics = await Analytics.load(new MemoryStorage()); // the meter counts this wallet session only

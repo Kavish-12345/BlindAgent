@@ -25,3 +25,4 @@ export * from './policy/presets.js';
 export * from './policy/drafter.js';
 export * from './analytics/analytics.js';
 export * from './session/wallet-host.js';
+export * from './keys/rules-signer.js';

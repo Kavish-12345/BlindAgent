@@ -41,6 +41,7 @@ function renderKey() {
   $('keyState').innerHTML = unlockedKeys.has(k) ? `<span class="ok">AI key unlocked</span> (memory only)` : storedKey(k) ? 'AI key stored encrypted — enter your passphrase and unlock' : c.keyRequired ? 'No AI key yet — paste it once (encrypted with your passphrase)' : 'Optional for this endpoint (many local servers need no key)';
   $('aiKeyRow').style.display = storedKey(k) ? 'none' : '';
   $('aiUnlockRow').style.display = unlockedKeys.has(k) || !storedKey(k) ? 'none' : '';
+  if (typeof renderSteps === 'function' && document.getElementById('steps')) renderSteps();
 }
 $('model').onchange = renderKey;
 $('saveKey').onclick = async () => {
@@ -74,6 +75,29 @@ $('forgetKey').onclick = () => {
   renderKey();
 };
 
+// ------------------------------------------------------------------ guided start
+let showSetup = false;
+function renderSteps() {
+  const connected = Boolean(session && !session.endedBy);
+  const c = choice();
+  const keyOk = !c.keyRequired || unlockedKeys.has(c.keyName);
+  const ready = connected && keyOk;
+  $('hero').style.display = ready && !showSetup ? 'none' : '';
+  $('s1').classList.toggle('done', connected);
+  $('s2').classList.toggle('done', keyOk);
+  $('connect2').style.display = connected ? 'none' : '';
+  $('s1done').style.display = connected ? '' : 'none';
+  $('aiPill').style.display = keyOk ? '' : 'none';
+  ($('run') as HTMLButtonElement).disabled = !ready || running;
+  (document.querySelector('footer') as HTMLElement).style.display = ready && !showSetup ? '' : 'none';
+  $('hint').textContent = !connected ? 'Step 1: connect your wallet.' : !keyOk ? 'Step 2: unlock the AI.' : 'Your wallet checks every payment against your rules before anything is sent.';
+}
+$('connect2').onclick = () => $('connect').click();
+$('aiPill').onclick = () => {
+  showSetup = !showSetup;
+  renderSteps();
+};
+
 // ------------------------------------------------------------------ wallet session (@blindspot/sdk)
 let session: BlindspotSession | null = null;
 let lastEnded: string | null = null;
@@ -87,6 +111,7 @@ function renderSession() {
       : 'Not connected';
   $('disconnect').style.display = s ? '' : 'none';
   $('connect').style.display = s ? 'none' : '';
+  renderSteps();
 }
 $('connect').onclick = async () => {
   note('Opening the Blindspot wallet… Unlock it if needed, then approve the connection request there.');
@@ -125,6 +150,7 @@ const STEP: Record<string, string> = {
 };
 function add(cls: string, html: string) {
   $('empty').style.display = 'none';
+  $('hero').style.display = 'none';
   const li = document.createElement('li');
   li.className = `msg ${cls}`;
   li.innerHTML = html;
@@ -193,6 +219,7 @@ async function run(scripted: boolean) {
   }
   running = true;
   ($('run') as HTMLButtonElement).disabled = true;
+  $('run').textContent = 'Working…';
   ($('runScripted') as HTMLButtonElement).disabled = true;
   const task = $<HTMLTextAreaElement>('task').value.trim();
   add('user', esc(task));
@@ -207,7 +234,8 @@ async function run(scripted: boolean) {
     if (r.stoppedBy !== 'final') note(r.stoppedBy === 'stopped' ? `Stopped: ${r.error}` : r.stoppedBy === 'stepLimit' ? 'Stopped: too many steps.' : `Something went wrong: ${r.error}`, r.stoppedBy === 'stopped' ? 'warn' : 'bad');
   } finally {
     running = false;
-    ($('run') as HTMLButtonElement).disabled = false;
+    renderSteps();
+    $('run').textContent = 'Send';
     ($('runScripted') as HTMLButtonElement).disabled = false;
   }
 }
@@ -227,6 +255,18 @@ $<HTMLTextAreaElement>('task').addEventListener('keydown', (e) => {
     void run(false);
   }
 });
+const toggleDev = (on?: boolean) => {
+  const p = $('devPanel');
+  p.style.display = (on ?? p.style.display === 'none') ? '' : 'none';
+};
+if (new URLSearchParams(location.search).has('dev')) toggleDev(true);
+addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+    e.preventDefault();
+    toggleDev();
+  }
+});
 $<HTMLSelectElement>('model').value = 'groq-120b'; // default every load (browsers restore old form values)
 renderKey();
 renderSession();
+renderSteps();
