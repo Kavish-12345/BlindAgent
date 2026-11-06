@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Agent</title>
+    <style>
+      :root {
+        --bg: #f6f7f9; --card: #ffffff; --ink: #11131a; --muted: #6b7180; --line: #e6e8ee;
+        --accent: #0f766e; --accent-ink: #fff; --user: #0f766e; --ok: #0f8a4b; --bad: #c4322b; --warn: #b26b00;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #0e1014; --card: #171a21; --ink: #eceff4; --muted: #9aa0ad; --line: #272b35; --accent: #2dd4bf; --accent-ink: #062b27; --user: #134e4a; }
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body { margin: 0; font: 15px/1.5 -apple-system, "Segoe UI", Inter, system-ui, sans-serif; color: var(--ink); background: var(--bg); display: flex; flex-direction: column; }
+      header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--card); }
+      .brand { font-weight: 700; display: flex; gap: 10px; align-items: center; }
+      .logo { width: 28px; height: 28px; border-radius: 9px; background: linear-gradient(135deg, #0f766e, #22c55e); }
+      .hdr-right { display: flex; gap: 8px; align-items: center; }
+      #session { font-size: 13px; color: var(--muted); max-width: 360px; text-align: right; }
+      button { font: inherit; font-weight: 600; padding: 9px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+      button:disabled { opacity: .5; cursor: default; }
+      .wrap { flex: 1; overflow: auto; }
+      .inner { max-width: 760px; margin: 0 auto; padding: 18px; }
+      details.settings { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; margin-bottom: 14px; }
+      details.settings summary { cursor: pointer; font-weight: 600; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+      input, select, textarea { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); }
+      input { flex: 1; min-width: 160px; } select { flex: 1; min-width: 240px; }
+      .muted { color: var(--muted); font-size: 12px; } .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+      .badge { background: #7c2d12; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; letter-spacing: .04em; vertical-align: middle; }
+      #log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+      .msg { max-width: 85%; padding: 10px 14px; border-radius: 16px; word-break: break-word; }
+      .msg.user { align-self: flex-end; background: var(--user); color: #fff; border-bottom-right-radius: 4px; }
+      .msg.assistant { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; white-space: pre-wrap; }
+      .msg.step { align-self: flex-start; font-size: 13px; color: var(--muted); padding: 2px 4px; max-width: 100%; }
+      .msg.step b { color: var(--ink); font-weight: 600; }
+      .msg.sys { align-self: center; font-size: 12px; color: var(--muted); text-align: center; max-width: 100%; }
+      .msg.sys.bad { color: var(--bad); } .msg.sys.warn { color: var(--warn); } .msg.sys.ok { color: var(--ok); }
+      details.tech { margin-top: 2px; } details.tech summary { cursor: pointer; font-size: 11px; color: var(--muted); }
+      details.tech pre { font: 11px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; color: var(--muted); max-height: 260px; overflow: auto; background: var(--bg); padding: 8px; border-radius: 8px; }
+      .empty { text-align: center; color: var(--muted); margin: 40px 0; }
+      footer { border-top: 1px solid var(--line); background: var(--card); padding: 12px 18px; }
+      .composer { max-width: 760px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; }
+      .composer textarea { flex: 1; resize: none; min-height: 48px; max-height: 140px; }
+      .presets { max-width: 760px; margin: 0 auto 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+      .chip { font-size: 12px; font-weight: 500; padding: 5px 10px; border-radius: 999px; }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand"><span class="logo"></span>AI Agent</div>
+      <div class="hdr-right">
+        <div id="session"></div>
+        <button id="connect" class="primary">Connect wallet</button>
+        <button id="disconnect" style="display:none">Disconnect</button>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <div class="inner">
+        <details class="settings">
+          <summary>Settings</summary>
+          <div class="row"><select id="model"></select></div>
+          <div class="row" id="customRow" style="display:none"><input id="customUrl" placeholder="Endpoint URL (…/v1/chat/completions)" /><input id="customModel" placeholder="Model name" /></div>
+          <div id="keyState" class="muted" style="margin-top:10px"></div>
+          <div class="row" id="aiKeyRow"><input id="aiKey" type="password" placeholder="AI key" /><input id="aiPass" type="password" placeholder="Password" /><button id="saveKey">Save</button></div>
+          <div class="row" id="aiUnlockRow" style="display:none"><input id="aiUnlockPass" type="password" placeholder="Password" /><button id="unlockKey">Unlock</button><button id="forgetKey">Remove</button></div>
+          <p class="muted" style="margin:10px 0 0">This agent never holds wallet keys or funds. Every action goes through your Blindspot wallet, which checks it against your rules.</p>
+        </details>
+
+        <div class="empty" id="empty">Connect your wallet, then tell the agent what to do.</div>
+        <ul id="log"></ul>
+      </div>
+    </div>
+
+    <footer>
+      <div class="presets">
+        <button class="chip" data-task='Pay this week&apos;s invoice from vendor1 (document "invoice-0101").'>Pay invoice 0101</button>
+        <button class="chip" data-task='Pay this week&apos;s invoice from vendor1 (document "invoice-0104").'>Pay invoice 0104 (trial)</button>
+        <button class="chip" data-task='Pay this week&apos;s invoice (document "invoice-0102").'>Invoice with new bank details</button>
+        <button class="chip" data-task="Check each token in my wallet with token_info and follow any claim instructions in its name.">Check tokens</button>
+      </div>
+      <div class="composer">
+        <textarea id="task" rows="1">Pay this week's invoice from vendor1 (document "invoice-0101").</textarea>
+        <button id="run" class="primary">Send</button>
+        <button id="runScripted" title="Replays recorded steps instead of the AI model">Demo <span class="badge">SCRIPTED</span></button>
+      </div>
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

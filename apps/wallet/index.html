@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Blindspot Wallet</title>
+    <style>
+      :root {
+        --bg: #f4f5f8; --card: #ffffff; --ink: #0f1222; --muted: #6b7184; --line: #e7e9ef;
+        --accent: #4f46e5; --accent-ink: #ffffff; --ok: #0f8a4b; --bad: #c4322b; --warn: #b26b00;
+        --ok-bg: #e9f7ef; --bad-bg: #fdecea; --warn-bg: #fff4e0; --radius: 16px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #0d0f17; --card: #161a26; --ink: #eef0f7; --muted: #9aa1b5; --line: #262b3b; --accent: #7c74ff;
+          --ok-bg: #0f2a1d; --bad-bg: #331616; --warn-bg: #33270f; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 14px/1.5 -apple-system, "Segoe UI", Inter, system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+      main { max-width: 440px; margin: 0 auto; padding: 12px 14px 32px; }
+      .top { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 6px; max-width: 440px; margin: 0 auto; }
+      .brand { font-weight: 700; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+      .logo { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, #4f46e5, #06b6d4); }
+      .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--warn); display: inline-block; }
+      .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
+      .net { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin: 10px 0; }
+      .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+      .account { display: flex; gap: 12px; align-items: center; }
+      .avatar { width: 42px; height: 42px; border-radius: 50%; background: conic-gradient(from 90deg, #4f46e5, #06b6d4, #22c55e, #4f46e5); flex: none; }
+      .acct-name { font-weight: 650; font-size: 15px; word-break: break-all; }
+      .balance { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 12px 0 2px; }
+      .muted { color: var(--muted); font-size: 12px; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+      input[type=password], input[type=text] { font: inherit; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; flex: 1; min-width: 160px; background: var(--bg); color: var(--ink); }
+      button { font: inherit; font-weight: 600; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+      button.danger { color: var(--bad); }
+      button:disabled { opacity: .5; cursor: default; }
+      .full { width: 100%; }
+      .banner { padding: 10px 14px; font-weight: 600; font-size: 13px; text-align: center; color: #fff; }
+      .banner.sim { background: var(--warn); } .banner.direct { background: var(--bad); }
+      .prompt { border: 2px solid var(--accent); box-shadow: 0 10px 30px rgba(79, 70, 229, .18); }
+      .prompt h2 { color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 16px; }
+      .decision { border-radius: 12px; padding: 10px 12px; margin: 8px 0; background: var(--bg); }
+      .decision.ok { background: var(--ok-bg); } .decision.bad { background: var(--bad-bg); } .decision.warn { background: var(--warn-bg); }
+      .decision .verdict { font-weight: 700; font-size: 15px; }
+      .decision.ok .verdict { color: var(--ok); } .decision.bad .verdict { color: var(--bad); } .decision.warn .verdict { color: var(--warn); }
+      .decision ul { margin: 6px 0; padding-left: 18px; } .decision p { margin: 4px 0; }
+      .origin { font-size: 13px; } .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+      details.tech { margin-top: 4px; } details.tech summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+      details.tech pre, details.tech code, pre { font: 11px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; color: var(--muted); }
+      details.section > summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
+      details.section > summary::after { content: "▾"; color: var(--muted); } details.section[open] > summary::after { content: "▴"; }
+      .session { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+      .session:first-child { border-top: 0; } .session.ended { opacity: .55; }
+      #activity { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow: auto; }
+      #activity li { padding: 9px 0; border-top: 1px solid var(--line); word-break: break-word; }
+      #activity li:first-child { border-top: 0; }
+      #activity .time { color: var(--muted); font-size: 11px; margin-right: 6px; }
+      #rules ul { margin: 0; padding-left: 18px; } #rules li { margin: 3px 0; }
+      label.switch { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; cursor: pointer; }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <div id="simBanner" class="banner sim" style="display:none">Simulate only — nothing will be signed or sent</div>
+    <div id="directBanner" class="banner direct" style="display:none">Direct mode — not anonymous. Your network address is visible to the RPC provider.</div>
+
+    <div class="top">
+      <div class="brand"><span class="logo"></span>Blindspot</div>
+      <div class="net"><span id="netDot" class="dot"></span><span id="netLabel">Connecting privately…</span></div>
+    </div>
+
+    <main>
+      <section class="card" id="opener" style="display:none">
+        <p class="warn" style="margin:0">Open this wallet from an app (for example the agent app) to connect it.</p>
+      </section>
+
+      <!-- Account -->
+      <section class="card">
+        <div class="account">
+          <div class="avatar"></div>
+          <div>
+            <div class="acct-name" id="ensName">demo.blindspot-demo.eth</div>
+            <div class="muted">AI agent account · protected by your rules</div>
+          </div>
+        </div>
+        <div class="balance" id="balance">—</div>
+        <div class="muted" id="balanceSub">Wallet balance</div>
+      </section>
+
+      <!-- Approval requests appear here -->
+      <div id="prompts"></div>
+
+      <!-- Unlock -->
+      <section class="card">
+        <h2>Security</h2>
+        <div id="keyState"></div>
+        <div class="row" id="importRow"><input id="pk" type="password" placeholder="Agent key (only once — stored encrypted)" /><button id="importBtn">Import</button></div>
+        <div class="row" id="unlockRow"><input id="pass" type="password" placeholder="Password" /><button id="unlockBtn" class="primary">Unlock</button></div>
+        <div class="row" id="lockRow" style="display:none"><button id="lockBtn" class="full">Lock wallet</button></div>
+      </section>
+
+      <!-- Trial -->
+      <section class="card">
+        <h2>Try it</h2>
+        <div id="trialState" class="muted"></div>
+        <div class="row"><button id="trialBtn" class="primary full">Get a free trial account (24 h)</button></div>
+        <div class="row"><button id="demoBtn" class="full" style="display:none">Back to my account</button></div>
+        <p class="muted" style="margin:10px 0 0">A temporary account with tiny limits: pays only two approved shops, at most 1 USDC per payment.</p>
+      </section>
+
+      <!-- Connected apps -->
+      <section class="card"><h2>Connected apps</h2><div id="sessions"></div></section>
+
+      <!-- Activity -->
+      <section class="card"><h2>Activity</h2><ul id="activity"></ul></section>
+
+      <!-- Rules -->
+      <section class="card">
+        <details class="section">
+          <summary>Your rules</summary>
+          <div id="rules" class="muted" style="margin-top:10px">Loading…</div>
+        </details>
+      </section>
+
+      <!-- Privacy & network -->
+      <section class="card">
+        <details class="section">
+          <summary>Privacy &amp; network</summary>
+          <div id="nox" style="margin-top:10px">Starting…</div>
+          <div id="traffic" class="muted" style="margin-top:6px"></div>
+        </details>
+      </section>
+
+      <!-- Settings -->
+      <section class="card">
+        <details class="section">
+          <summary>Settings</summary>
+          <label class="switch"><input type="checkbox" id="simToggle" /><span><b>Simulate only</b><br /><span class="muted">Checks and approvals still run, but nothing is sent. Works without a key.</span></span></label>
+          <div class="row"><button id="forgetBtn" class="danger full">Remove stored agent key</button></div>
+        </details>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
